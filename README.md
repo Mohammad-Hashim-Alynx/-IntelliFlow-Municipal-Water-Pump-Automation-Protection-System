@@ -1,226 +1,241 @@
 # -IntelliFlow-Municipal-Water-Pump-Automation-Protection-System
 IntelliFlow™ is an experimental municipal-grade water pump automation and protection system built on ESP32-P4. It integrates flow, pressure, cavitation, and dry-run monitoring to enable safe unattended operation, enhance water efficiency, protect motors, and improve reliability for household and small utility water systems.
 
-Author: MD Hashim
-Status: R&D / Field-tested Experimental Build
-Platform: ESP32 (Arduino framework)
-Operation: Fully Offline (No Wi-Fi, No Cloud, No Blynk)
+# Smart Water Pump Controller (ESP32)
 
-Overview
+**Author:** MD Hashim  
+**Status:** R&D / Field-Tested Experimental Build  
+**Platform:** ESP32 (Arduino Framework)  
+**Operation:** Fully Offline (No Wi-Fi, No Cloud, No Blynk)
 
-This project implements a municipal-grade automatic water pump control and protection system using an ESP32.
-It is designed for unattended operation, prioritizing motor safety, water efficiency, and system reliability under unstable supply conditions.
+---
 
-The controller continuously monitors three water electrodes (inlet, flow confirmation, and tank level) and operates a pump using a deterministic, non-blocking state machine with multiple layers of fault protection.
+## Overview
 
-The design philosophy mirrors industrial pump controllers, adapted for household and small utility systems.
+This project implements a **municipal-grade automatic water pump control and protection system** using an ESP32.  
+It is designed for **unattended operation**, prioritizing **motor safety, water efficiency, and system reliability** under unstable water supply conditions.
 
-Key Design Goals
+The controller continuously monitors **three water electrodes** (inlet, flow confirmation, and tank level) and operates the pump using a **deterministic, non-blocking state machine** with multiple layers of protection.
 
-Eliminate manual pump operation
+The design philosophy follows **industrial pump controller principles**, adapted for household and small-utility systems.
 
-Prevent dry-run and no-flow damage
+---
 
-Ensure stable startup before motor engagement
+## Key Design Goals
 
-Protect against intermittent water supply
+- Eliminate manual pump operation  
+- Prevent dry-run and no-flow damage  
+- Ensure stable startup before motor engagement  
+- Protect against intermittent water supply  
+- Enable automatic fault recovery  
+- Remain **fully offline** for maximum reliability  
 
-Recover automatically from fault conditions
+---
 
-Remain fully offline for maximum reliability
+## System Architecture
 
-Core Features
-1. Deterministic State Machine
+### State Machine
 
-The firmware operates using four well-defined system states:
+The firmware operates using **four well-defined system states**:
 
-State	Description
-WAITING_FOR_WATER	Monitors inlet availability (Electrode 1)
-STARTUP_STABILIZATION	Verifies stable water presence for 3 minutes
-PUMP_RUNNING	Active pumping with continuous monitoring
-FAILURE_COOLDOWN	Safety lockout and timed auto-reset
+| State | Description |
+|------|------------|
+| `STATE_WAITING_FOR_WATER` | Monitors inlet water availability |
+| `STATE_STARTUP_STABILIZATION` | Verifies stable water for 3 minutes |
+| `STATE_PUMP_RUNNING` | Active pumping with live monitoring |
+| `STATE_FAILURE_COOLDOWN` | Safety lockout with timed auto-reset |
 
-This guarantees predictable behavior and safe transitions.
+This guarantees **predictable behavior** and **safe state transitions**.
 
-2. Multi-Layer Water Detection
+---
 
-Three electrodes are used with time-division ADC multiplexing:
+## Core Features
 
-Electrode 1: Inlet water availability
+### Multi-Layer Water Detection
+Three conductive electrodes are used with **time-division ADC multiplexing**:
 
-Electrode 2: Flow confirmation after pump start
+- **Electrode 1:** Inlet water detection  
+- **Electrode 2:** Flow confirmation after pump start  
+- **Electrode 3:** Tank full detection  
 
-Electrode 3: Tank full detection
+Only **one electrode is excited at a time**, eliminating ADC noise and cross-coupling.
 
-Each electrode is excited independently to eliminate ADC cross-coupling and noise.
+---
 
-3. Startup Stabilization Logic
-
+### Startup Stabilization Logic
 Before starting the pump:
-
-Water must be continuously present at the inlet
-
-Verified for 3 minutes
-
-Any interruption resets the timer
+- Water must be continuously present at inlet
+- Verified for **3 minutes**
+- Any interruption resets the timer
 
 This prevents motor stress from unstable supply.
 
-4. Dry-Run & Flow Protection
+---
 
-While running:
+### Dry-Run & Flow Protection
 
-If Electrode 2 is not detected within 5 minutes, pump shuts down
+While the pump is running:
 
-Single sensor loss → shutdown after 15 seconds
+- Electrode-2 not detected within **5 minutes** → shutdown  
+- Single sensor loss → shutdown after **15 seconds**  
+- Dual sensor loss → shutdown after **7 seconds**
 
-Dual sensor loss → shutdown after 7 seconds
+This balances **false-trigger resistance** and **motor safety**.
 
-These thresholds balance false positives vs motor safety.
+---
 
-5. Tank Full Protection
+### Tank Full Protection
 
-When the tank-full electrode is detected:
+- 3-second confirmation delay
+- Pump stops cleanly
+- **Non-blocking continuous buzzer** for 5 seconds
 
-3-second confirmation delay
+---
 
-Pump stops cleanly
-
-Non-blocking continuous buzzer alarm for 5 seconds
-
-6. Automatic Recovery (Fail-Safe)
+### Automatic Recovery (Fail-Safe)
 
 After any shutdown:
+- System enters **20-minute cooldown**
+- Prevents short-cycling and overheating
+- Automatically returns to waiting state
 
-System enters 20-minute cooldown
+---
 
-Prevents short-cycling and motor overheating
+### Reset & Fault Awareness
 
-Automatically resets to waiting state afterward
+- ESP32 reset reason is analyzed on boot
+- Unexpected resets trigger **1-hour pulsing error LED**
+- Helps diagnose brownouts, watchdogs, or crashes
 
-7. Reset & Fault Awareness
+---
 
-On every boot:
+### Non-Blocking Architecture
 
-ESP32 reset reason is analyzed
+- `millis()`-based timing throughout
+- No blocking delays in control logic
+- Buzzer alarms handled asynchronously
+- Suitable for long-term unattended operation
 
-Unexpected resets trigger a 1-hour pulsing error LED
+---
 
-Helps diagnose brownouts, watchdog resets, or crashes
+## Hardware Requirements
 
-8. Fully Non-Blocking Architecture
+### Controller
+- ESP32 development board (tested on ESP32 Dev modules)
 
-millis()-based timing throughout
+### Sensors
+- 3 × conductive water electrodes  
+- External resistor network (recommended)
 
-No long blocking delays in control logic
+### Outputs
+- Relay or contactor (with opto-isolation)
+- Piezo buzzer
+- Status LEDs (recommended)
 
-Buzzer alarms handled asynchronously
+### Power
+- Stable regulated supply (5V / 3.3V)
+- Brownout protection strongly recommended
 
-Suitable for long-term unattended operation
+---
 
-Hardware Requirements
-Controller
+## GPIO Mapping
 
-ESP32 (tested with ESP32 Dev modules)
+### Electrode Excitation
 
-Sensors
+| Function | GPIO |
+|--------|------|
+| Electrode 1 | GPIO 21 |
+| Electrode 2 | GPIO 22 |
+| Electrode 3 | GPIO 23 |
 
-Conductive water electrodes (3)
+### ADC Inputs
 
-External resistor network (recommended)
+| Function | GPIO |
+|--------|------|
+| Inlet (E1) | GPIO 32 |
+| Flow (E2) | GPIO 33 |
+| Tank Full (E3) | GPIO 34 (Input-only) |
 
-Outputs
+### Outputs
 
-Relay or contactor (with opto-isolation)
+| Function | GPIO |
+|--------|------|
+| Pump Relay | GPIO 18 |
+| Buzzer | GPIO 19 |
 
-Piezo buzzer
+### LEDs
 
-Status LEDs (optional but recommended)
+| Indicator | GPIO |
+|---------|------|
+| Electrode 1 Status | GPIO 25 |
+| Electrode 2 Status | GPIO 26 |
+| Tank Full Status | GPIO 27 |
+| Stabilization Phase | GPIO 4 |
+| Flow-Wait Phase | GPIO 16 |
+| Auto-Reset Phase | GPIO 17 |
+| Error / Reset LED | GPIO 2 |
 
-Power
+> All GPIOs are chosen to **avoid ESP32 strapping pins**.
 
-Stable 5V / 3.3V regulated supply
+---
 
-Brownout protection strongly recommended
+## LED Indications
 
-GPIO Mapping
-Electrode Excitation
-Function	GPIO
-Electrode 1	GPIO 21
-Electrode 2	GPIO 22
-Electrode 3	GPIO 23
-ADC Inputs
-Function	GPIO
-Inlet (E1)	GPIO 32
-Flow (E2)	GPIO 33
-Tank Full (E3)	GPIO 34 (input-only)
-Outputs
-Function	GPIO
-Pump Relay	GPIO 18
-Buzzer	GPIO 19
-LEDs
-Indicator	GPIO
-Electrode 1	GPIO 25
-Electrode 2	GPIO 26
-Tank Full	GPIO 27
-Stabilization Phase	GPIO 4
-Flow-Wait Phase	GPIO 16
-Auto-Reset Phase	GPIO 17
-Error / Reset LED	GPIO 2
+| LED Color | Meaning |
+|---------|---------|
+| Blue | Startup stabilization active |
+| Yellow | Waiting for flow confirmation |
+| Red | Failure cooldown / auto-reset |
+| Error LED | Unexpected system reset |
 
-All GPIOs were selected to avoid ESP32 strapping pins.
+---
 
-LED Indications
-LED Color	Meaning
-Blue	Startup stabilization active
-Yellow	Waiting for flow confirmation
-Red	Failure cooldown / auto-reset
-Error LED	Unexpected system reset
-Serial Diagnostics
+## Serial Diagnostics
 
 The firmware provides detailed serial logs:
+- Current system state
+- Raw ADC values
+- Timing countdowns
+- Reset causes
+- Active alarms
 
-System state
+Useful for debugging and field tuning.
 
-Raw ADC values
+---
 
-Timing countdowns
+## Safety Disclaimer
 
-Reset causes
+⚠ **WARNING**
 
-Active alarms
+This firmware controls **high-voltage and high-power equipment**.
 
-Useful for tuning thresholds and debugging installations.
+- Use proper electrical isolation
+- Use relays/contactors rated for motor load
+- Add fuses, MCBs, and surge protection
+- Never connect pumps directly to GPIO pins
 
-Safety Disclaimer
+The author assumes **no liability** for misuse or damage.
 
-⚠ WARNING
+---
 
-This firmware controls high-voltage and high-power equipment.
+## License
 
-Use proper electrical isolation
-
-Use contactors/relays rated for motor load
-
-Add fuses, MCBs, and surge protection
-
-Do not connect pumps directly to GPIO pins
-
-The author assumes no liability for misuse, damage, or injury.
-
-License
-This project is released under the MIT License.
+This project is released under the **MIT License**.  
 You are free to use, modify, and distribute the code with attribution.
 
-Project Status & Future Work
+---
 
-✔ Field-tested in household environment
-✔ Stable long-duration operation
-🔧 Future: pressure sensor integratio
-🔧 Future: data logging / statistics
-🔧 Future: configurable thresholds
+## Project Status & Future Work
 
-Author
+- ✔ Field-tested in household environment  
+- ✔ Stable long-duration operation  
+- 🔧 Planned: pressure sensor integration  
+- 🔧 Planned: data logging & statistics  
+- 🔧 Planned: configurable thresholds  
 
-MD Hashim
+---
+
+## Author
+
+**MD Hashim**  
 Mechanical Engineer | Embedded Automation | Control Systems
