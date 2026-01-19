@@ -218,8 +218,13 @@ The author assumes **no liability** for misuse or damage.
 
 ## License
 
-This project is released under the **MIT License**.  
-You are free to use, modify, and distribute the code with attribution.
+This project is licensed under the **Apache License, Version 2.0**.
+
+You may use, modify, and distribute this software in compliance with the License.
+The license also provides an explicit grant of patent rights and includes
+limitations of liability.
+
+See the `LICENSE` file for full details.
 
 ---
 
